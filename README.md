@@ -1,4 +1,4 @@
-# SD2-DataExtractor 钢铁之师2数据提取器
+# SD2-DataExtractor 钢铁之师2 数据提取器
 
 ----
 
