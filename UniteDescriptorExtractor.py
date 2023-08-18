@@ -5,78 +5,59 @@ file = open("mymod/GameData/Generated/Gameplay/Gfx/111.ts",'r')
 #file = open("mymod/GameData/Generated/Gameplay/Gfx/UniteDescriptor.ndf",'r')
 data = file.readlines()
 
-lines = [i for i in data if i != '\n']
-str_all = "".join(lines)
-import re
-
-data = str_all
-#data = data.replace('(','{')
-#data = data.replace(')','}')
-def adjust_indentation(match):
-    level = len(match.group(1))
-    return ' ' * (level * 2) + match.group(2)
-
-def myre(data):
-    # 使用正则表达式匹配并移除 Selection 字段及其内容
-    pattern = r"\bSelection\b\s*=\s*\[[\s\S]*?\[[\s\S]*?\][\s\S]*?\](?=\s*,|\s*\))"
-    output_text = re.sub(pattern, "", data)
-    # 使用正则表达式匹配并移除 // Flags 部分及其内容
-    pattern = r"// Flags\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // TargetCoordinator 部分及其内容
-    pattern = r"// TargetCoordinator\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // TargetManager 部分及其内容
-    pattern = r"// TargetManager\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // Critical 部分及其内容
-    pattern = r"// Critical\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // PlayerMission 部分及其内容
-    pattern = r"// PlayerMission\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // LinkTeam 部分及其内容
-    pattern = r"// LinkTeam\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // Tags 部分及其内容
-    pattern = r"// Tags\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // Debug 部分及其内容
-    pattern = r"// Debug\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // Selection 部分及其内容
-    pattern = r"// Selection\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // EffectApplier 部分及其内容
-    pattern = r"// EffectApplier\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // InfluencePosition 部分及其内容
-    pattern = r"// InfluencePosition\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // InfluenceMap 部分及其内容
-    pattern = r"// InfluenceMap\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // OrderConfig 部分及其内容
-    pattern = r"// OrderConfig\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // OrderDisplay 部分及其内容
-    pattern = r"// OrderDisplay\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // GroupableUnit 部分及其内容
-    pattern = r"// GroupableUnit\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
-    # 使用正则表达式匹配并移除 // PackSignaux 部分及其内容
-    pattern = r"// PackSignaux\s*[\s\S]*?(?=// \w+|\Z)"
-    output_text = re.sub(pattern, "", output_text)
 
 
-    return output_text
+from pyparsing import (Word, alphanums, Forward, Suppress, Group, OneOrMore,
+                       ZeroOrMore, restOfLine, Literal,Optional)
 
+# 初始化
+identifier = Word(alphanums + "_")  # 定义标识符
 
+# 使用Forward预留空间，为之后的递归定义做准备
+value = Forward()
+key_value = Forward()
+value_list = Forward()
+key_value_list = Forward()
 
+# 符号定义
+LPAREN = Literal("(").suppress()
+RPAREN = Literal(")").suppress()
+LBRACK = Literal("[").suppress()
+RBRACK = Literal("]").suppress()
+COMMA = Literal(",").suppress()
+EQUAL = Literal("=").suppress()
 
-output_text = myre(data)
-with open('output.ts', 'w', encoding='utf-8') as f:
-    f.write(output_text)
+# 注释处理
+comment = Suppress("//") + restOfLine
 
-print("转换完成，结果已保存到output.yaml")
+# 值和键值对的定义
+value <<= identifier | value_list
+key_value <<= Group(identifier + EQUAL + value)
+
+# 值列表和键值列表的定义
+value_list <<= Group(LBRACK + ZeroOrMore(value + Optional(COMMA)) + RBRACK)
+key_value_list <<= Group(Optional(identifier) + LPAREN + OneOrMore((key_value_list | key_value) + Optional(COMMA)) + RPAREN)
+
+# Key-value pairs and module/block structures
+module = key_value_list
+
+# 主数据定义
+data = (Suppress("export") + identifier + Suppress("is") + identifier + module)
+
+# 测试
+test_str = '''
+export key1 is key2 (
+    key3 = [
+        val1,
+        val2,
+        val3
+    ],
+    key4 = aaa(
+        key5 = val4
+    ),
+    key6 = val5
+)
+'''
+
+parsed_data = data.parseString(test_str)
+print(parsed_data)
