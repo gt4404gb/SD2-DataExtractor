@@ -1,5 +1,5 @@
-from pyparsing import (Word, alphanums, Forward, Suppress, Group, OneOrMore,Regex,re,Combine,
-                       ZeroOrMore, restOfLine, Literal,Optional,Dict,SkipTo,StringEnd)
+from pyparsing import (Word, alphanums, ParseException, Suppress, Group,Regex,re,Combine,
+                       ZeroOrMore, restOfLine, Literal,Dict,SkipTo,StringEnd)
 import pandas as pd
 #file = open("111.ndf",'r')
 file = open("mymod/GameData/Generated/Gameplay/Gfx/UniteDescriptor.ndf",'r')
@@ -26,19 +26,30 @@ def CutExport(data):
     # 主数据定义
     mainData = (Suppress("export") + identifier + Suppress("is") + Suppress(identifier) + module_content)
     # 解析字符串
-    result = mainData.searchString(data)
-    return result
+    try:
+        result = mainData.searchString(data)
+        return result
+    except ParseException as e:
+        error_line = data.count('\n', 0, e.loc) + 1
+        print(f"Error occurred at line {error_line}: {e}")
+        return []
 
 #以注释为单位分割
 def CutComment(itemExport):
     GUID = Group("GUID" + ":{" + identifier + "}")
     DescriptorId = Group(identifier + EQUAL + GUID)
     ClassNameForDebug = Suppress(identifier) + EQUAL + SQUOTE + identifier + SQUOTE
-    # 使用正则表达式全部匹配直到最后一个')'字符
-    module_content = Regex(".*(?=\)$)", re.DOTALL)
+    # 使用正则表达式全部匹配直到最后一个')'字符，添加了\s*避免空行的问题
+    module_content = Regex(".*(?=\)\s*$)", re.DOTALL)
     # 主数据语法
     moduleData = LPAREN + Suppress(DescriptorId) + ClassNameForDebug + Suppress("Modules") + EQUAL + module_content
-    moduleDict = moduleData.parseString(itemExport[1])
+    try:
+        moduleDict = moduleData.parseString(itemExport[1])
+    except ParseException as e:
+        error_line = itemExport[1].count('\n', 0, e.loc) + 1
+        print(f"Error occurred at line {error_line}: {e}")
+        return '',{}
+
     UniteName = moduleDict[0]
     # 定义注释内容
     comment = Combine(Literal("// ").suppress() + restOfLine).setResultsName("comment")
@@ -59,7 +70,13 @@ def CutUnite(data):
     Value = Word(alphanums + "_" + "-" + "'" + "(" + ")" + "*" + " " + "~" + "/" + "." + "$")  # 定义标识符
     pattern = (identifier("key") + EQUAL + Value("value"))
     # 识别所有的为键值的元素
-    results = pattern.searchString(data)
+    try:
+        results = pattern.searchString(data)
+    except ParseException as e:
+        error_line = data.count('\n', 0, e.loc) + 1
+        print(f"Error occurred at line {error_line}: {e}")
+        return {}
+
     result_dict = {}
     # print(results.dump())
     for item in results:
