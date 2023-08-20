@@ -3,31 +3,6 @@ from pyparsing import (Word, alphanums, Forward, Suppress, Group, OneOrMore,Rege
 file = open("111.ndf",'r')
 #file = open("mymod/GameData/Generated/Gameplay/Gfx/UniteDescriptor.ndf",'r')
 test_str = file.read()
-# 测试
-test_str1 = '''
-export key1 is key1 (
-    key3 = [
-        val1,
-        val2,
-        val3
-    ],
-    key4 = aaa(
-        key5 = val4
-    ),
-    key6 = val5
-)
-export key2 is key2 (
-    key3 = [
-        val1,
-        val2,
-        val3
-    ],
-    key4 = aaa(
-        key5 = val4
-    ),
-    key6 = val5
-)
-'''
 
 
 # 初始化
@@ -65,35 +40,39 @@ def CutComment(itemExport):
     moduleDict = moduleData.parseString(itemExport[1])
     UniteName = moduleDict[0]
     # 定义注释内容
-    comment = Combine(Literal("//").suppress() + restOfLine).setResultsName("comment")
+    comment = Combine(Literal("// ").suppress() + restOfLine).setResultsName("comment")
     # 使用SkipTo来跳过内容直到下一个注释或字符串结束
     content_to_next_comment = SkipTo(comment | StringEnd(), include=False).setResultsName("content")
     # 主数据定义
     mainData = Dict(Group(comment + content_to_next_comment))
     # 解析字符串
     result = mainData.searchString(moduleDict[1])
-    return UniteName, result[0]
+    result_dict = {}
+    for item in result:
+        result_dict[item[0][0]] = item[0][1]
+    return UniteName, result_dict
+
+#提取单元中的键值
+def CutUnite(data):
+    # 定义所需的解析元素
+    Value = Word(alphanums + "_" + "-" + "'" + "(" + ")" + "*" + " " + "~" + "/" + "." + "$")  # 定义标识符
+    pattern = (identifier("key") + EQUAL + Value("value"))
+    # 识别所有的为键值的元素
+    results = pattern.searchString(data)
+    result_dict = {}
+    # print(results.dump())
+    for item in results:
+        if not result_dict.get(item[0]):
+            result_dict[item[0]] = item[1]
+    return result_dict
 
 if __name__ == "__main__" :
-    # 使用Forward预留空间，为之后的递归定义做准备
-    value = Forward()
-    key_value = Forward()
-    value_list = Forward()
-    key_value_list = Forward()
-
-    # 值和键值对的定义
-    value <<= identifier | value_list
-    key_value <<= Group(identifier + EQUAL + value)
-
-    # 值列表和键值列表的定义
-    value_list <<= Group(LBRACK + ZeroOrMore(value + Optional(COMMA)) + RBRACK)
-    key_value_list <<= Group(Optional(identifier) + LPAREN + OneOrMore((key_value_list | key_value) + Optional(COMMA)) + RPAREN)
-
-    # Key-value pairs and module/block structures
-    module = key_value_list
 
     allExport = CutExport(test_str)
     for itemExport in allExport:
         itemName,itemResult = CutComment(itemExport)
         print(itemName)
-        print(itemResult[0])
+        for uniteKey, uniteValue in itemResult.items():
+            print(uniteKey)
+            result_dict = CutUnite(uniteValue)
+            print(result_dict)
