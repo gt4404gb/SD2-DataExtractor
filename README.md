@@ -23,9 +23,13 @@
 ## 二、提取数据
 将生成的文件夹整个放在本程序根目录下，也就是py文件同路径
 
-使用 `python AmmunitionExtractor.py` 提取武器信息
+使用 `python AmmunitionExtractor.py` 提取武器（枪炮）信息
 
+使用 `python WeaponDescriptorExtractor.py` 提取武器（载具）信息
 
+使用 `python UniteDescriptorExtractor.py` 提取单位信息
+
+以上均会输出CSV文件
 
 
 
