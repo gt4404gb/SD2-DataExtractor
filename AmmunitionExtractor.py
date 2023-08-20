@@ -178,5 +178,5 @@ translation_dict = {
     'IsSubAmmunition': '是否为子弹药'
 }
 # 将字段名替换为中文
-#df = df.rename(columns=translation_dict)
-df.to_csv("output.csv", index=False)
+df = df.rename(columns=translation_dict)
+df.to_csv("Ammunition.csv", index=False)
