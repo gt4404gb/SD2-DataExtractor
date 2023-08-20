@@ -1,7 +1,8 @@
 from pyparsing import (Word, alphanums, Forward, Suppress, Group, OneOrMore,Regex,re,Combine,
                        ZeroOrMore, restOfLine, Literal,Optional,Dict,SkipTo,StringEnd)
-file = open("111.ndf",'r')
-#file = open("mymod/GameData/Generated/Gameplay/Gfx/UniteDescriptor.ndf",'r')
+import pandas as pd
+#file = open("111.ndf",'r')
+file = open("mymod/GameData/Generated/Gameplay/Gfx/UniteDescriptor.ndf",'r')
 test_str = file.read()
 
 
@@ -66,13 +67,41 @@ def CutUnite(data):
             result_dict[item[0]] = item[1]
     return result_dict
 
+def flatten_dict(d, parent_key='', sep='/'):
+    """
+    Convert nested dictionaries to flat dictionary.
+    """
+    items = {}
+    for k, v in d.items():
+        new_key = parent_key + sep + k if parent_key else k
+        if isinstance(v, dict):
+            items.update(flatten_dict(v, new_key, sep=sep))
+        else:
+            items[new_key] = v
+    return items
+
+
 if __name__ == "__main__" :
 
     allExport = CutExport(test_str)
+    items = []
     for itemExport in allExport:
         itemName,itemResult = CutComment(itemExport)
-        print(itemName)
+        #print(itemName)
         for uniteKey, uniteValue in itemResult.items():
-            print(uniteKey)
             result_dict = CutUnite(uniteValue)
-            print(result_dict)
+            itemResult[uniteKey] = result_dict
+        #print(itemResult)
+        flat_dict = flatten_dict(itemResult)
+        items.append([itemName,flat_dict])
+    # 创建空的DataFrame
+    df = pd.DataFrame()
+
+    # 为每个item填充DataFrame
+    for item_name, item_data in items:
+        #print(item_data)
+        temp_df = pd.DataFrame([item_data], index=[item_name])
+        df = pd.concat([df, temp_df], axis=0)
+
+    # 保存DataFrame到CSV
+    df.to_csv('UniteDescriptor.csv')
