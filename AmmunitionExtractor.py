@@ -23,14 +23,19 @@ for line in lines:
     if "[" in stripped_line:
         list_mode = True
         list_data = []
-        list_key = stripped_line.split('=')[0].strip()
+        if '=' in stripped_line:
+            list_key = stripped_line.split('=')[0].strip()
+        else:
+            # 独立的 [ 是前一个值的限定符，跳过此列表
+            list_key = '__skip__'
         continue
 
     # 在列表模式中处理数据
     if list_mode:
         if "]" in stripped_line:
             list_mode = False
-            current_record[list_key] = list_data
+            if list_key != '__skip__':
+                current_record[list_key] = list_data
             list_data = []
             list_key = None
             continue
@@ -81,7 +86,7 @@ for i in column_list:
     print(i)
 # 字段名和翻译的字典
 translation_dict = {
-    'ExportValue': '导出价值',
+    'ExportValue': '导出名称',
     'DescriptorId': '描述符标识',
     'Name': '名称',
     'TypeName': '类型名称',
@@ -98,7 +103,7 @@ translation_dict = {
     'ProjectileType': '弹丸类型',
     'FxWeaponType': '特效武器类型',
     'FxPower': '特效威力',
-    'Puissance': '功率',
+    'Puissance': '威力',
     'TempsEntreDeuxTirs': '射击间隔时间',
     'TempsEntreDeuxTirs_Min': '最小射击间隔时间',
     'TempsEntreDeuxTirs_Max': '最大射击间隔时间',
@@ -123,10 +128,10 @@ translation_dict = {
     'PhysicalDamages': '物理伤害',
     'RadiusSplashSuppressDamages': '爆炸抑制伤害半径',
     'SuppressDamages': '抑制伤害',
-    'RayonPinned': '固定半径',
+    'RayonPinned': '压制半径',
     'TirIndirect': '间接射击',
-    'TirReflexe': '反射射击',
-    'InterdireTirReflexe': '禁止反射射击',
+    'TirReflexe': '反应射击',
+    'InterdireTirReflexe': '禁止反应射击',
     'FX_vitesse_de_depart': '特效发射速度',
     'FX_tir_sans_physic': '特效无物理发射',
     'FX_frottement': '特效摩擦',
@@ -143,14 +148,14 @@ translation_dict = {
     'WeaponRessourcesNeeded': '武器所需资源',
     'AmbushShotDamageMultiplier': '伏击射击伤害倍数',
     'HitRollRuleDescriptor': '命中规则描述符',
-    'BaseCriticModifier': '基础批评修饰符',
-    'BaseEffectModifier': '基础效果修饰符',
-    'BaseHitValueModifiers': '基础命中值修饰符',
-    'HitModifierList': '命中修饰符列表',
+    'BaseCriticModifier': '基础暴击修正',
+    'BaseEffectModifier': '基础效果修正',
+    'BaseHitValueModifiers': '基础命中值修正',
+    'HitModifierList': '命中修正列表',
     'TempsDeVisee': '瞄准时间',
-    'TempsEntreDeuxSalves': '两次射击之间的时间',
-    'TempsEntreDeuxSalves_Min': '最小两次射击之间的时间',
-    'TempsEntreDeuxSalves_Max': '最大两次射击之间的时间',
+    'TempsEntreDeuxSalves': '齐射间隔时间',
+    'TempsEntreDeuxSalves_Min': '最小齐射间隔',
+    'TempsEntreDeuxSalves_Max': '最大齐射间隔',
     'NbTirParSalves': '每波射击次数',
     'NbrProjectilesSimultanes': '同时发射的弹丸数',
     'AffichageMunitionParSalve': '每波显示弹药量',

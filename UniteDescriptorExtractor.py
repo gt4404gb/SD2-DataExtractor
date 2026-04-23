@@ -1,87 +1,58 @@
-from pyparsing import (Word, alphanums, ParseException, Suppress, Group,Regex,re,Combine,
-                       ZeroOrMore, restOfLine, Literal,Dict,SkipTo,StringEnd)
+import re
 import pandas as pd
 #file = open("111.ndf",'r')
 file = open("mymod/GameData/Generated/Gameplay/Gfx/UniteDescriptor.ndf",'r')
 test_str = file.read()
 
 
-# 初始化
-identifier = Word(alphanums + "_" + "-")  # 定义标识符
-# 符号定义
-LPAREN = Literal("(").suppress()
-RPAREN = Literal(")").suppress()
-LBRACK = Literal("[").suppress()
-RBRACK = Literal("]").suppress()
-COMMA = Literal(",").suppress()
-EQUAL = Literal("=").suppress()
-SQUOTE = Literal("'").suppress()
-
-
 #以export为单位分割字符串
 def CutExport(data):
-    #将所有export分割
-    # 使用SkipTo来跳过模块内容
-    module_content = SkipTo("export", include=False) | SkipTo(StringEnd())
-    # 主数据定义
-    mainData = (Suppress("export") + identifier + Suppress("is") + Suppress(identifier) + module_content)
-    # 解析字符串
-    try:
-        result = mainData.searchString(data)
-        return result
-    except ParseException as e:
-        error_line = data.count('\n', 0, e.loc) + 1
-        print(f"Error occurred at line {error_line}: {e}")
-        return []
+    parts = re.split(r'\bexport\b', data)
+    results = []
+    for part in parts[1:]:
+        match = re.match(r'\s*(\w+)\s+is\s+\w+(.*)', part, re.DOTALL)
+        if match:
+            results.append((match.group(1), match.group(2)))
+    return results
 
 #以注释为单位分割
 def CutComment(itemExport):
-    GUID = Group("GUID" + ":{" + identifier + "}")
-    DescriptorId = Group(identifier + EQUAL + GUID)
-    ClassNameForDebug = Suppress(identifier) + EQUAL + SQUOTE + identifier + SQUOTE
-    # 使用正则表达式全部匹配直到最后一个')'字符，添加了\s*避免空行的问题
-    module_content = Regex(".*(?=\)\s*$)", re.DOTALL)
-    # 主数据语法
-    moduleData = LPAREN + Suppress(DescriptorId) + ClassNameForDebug + Suppress("Modules") + EQUAL + module_content
-    try:
-        moduleDict = moduleData.parseString(itemExport[1])
-    except ParseException as e:
-        error_line = itemExport[1].count('\n', 0, e.loc) + 1
-        print(f"Error occurred at line {error_line}: {e}")
-        return '',{}
+    content = itemExport[1]
+    # 提取 ClassNameForDebug
+    name_match = re.search(r"ClassNameForDebug\s*=\s*'([^']*)'", content)
+    if not name_match:
+        return '', {}
+    UniteName = name_match.group(1)
 
-    UniteName = moduleDict[0]
-    # 定义注释内容
-    comment = Combine(Literal("// ").suppress() + restOfLine).setResultsName("comment")
-    # 使用SkipTo来跳过内容直到下一个注释或字符串结束
-    content_to_next_comment = SkipTo(comment | StringEnd(), include=False).setResultsName("content")
-    # 主数据定义
-    mainData = Dict(Group(comment + content_to_next_comment))
-    # 解析字符串
-    result = mainData.searchString(moduleDict[1])
+    # 找到 Modules = [ 之后的内容
+    modules_match = re.search(r'Modules\s*=\s*\[', content)
+    if not modules_match:
+        return UniteName, {}
+    modules_content = content[modules_match.end():]
+
+    # 按 // 注释行分割
+    comment_pattern = re.compile(r'^[ \t]*//[ \t]+(.+)$', re.MULTILINE)
+    comments = list(comment_pattern.finditer(modules_content))
+
     result_dict = {}
-    for item in result:
-        result_dict[item[0][0]] = item[0][1]
+    for i, match in enumerate(comments):
+        comment_name = match.group(1).strip()
+        start = match.end()
+        end = comments[i + 1].start() if i + 1 < len(comments) else len(modules_content)
+        comment_content = modules_content[start:end].strip()
+        result_dict[comment_name] = comment_content
+
     return UniteName, result_dict
 
 #提取单元中的键值
 def CutUnite(data):
-    # 定义所需的解析元素
-    Value = Word(alphanums + "_" + "-" + "'" + "(" + ")" + "*" + " " + "~" + "/" + "." + "$")  # 定义标识符
-    pattern = (identifier("key") + EQUAL + Value("value"))
-    # 识别所有的为键值的元素
-    try:
-        results = pattern.searchString(data)
-    except ParseException as e:
-        error_line = data.count('\n', 0, e.loc) + 1
-        print(f"Error occurred at line {error_line}: {e}")
-        return {}
-
+    pattern = re.compile(r'(\w+)\s*=\s*(\S.*?)\s*$', re.MULTILINE)
     result_dict = {}
-    # print(results.dump())
-    for item in results:
-        if not result_dict.get(item[0]):
-            result_dict[item[0]] = item[1]
+    for match in pattern.finditer(data):
+        key = match.group(1)
+        value = match.group(2).strip().rstrip(',')
+        if key not in result_dict:
+            result_dict[key] = value
     return result_dict
 
 def flatten_dict(d, parent_key='', sep='/'):
@@ -139,7 +110,7 @@ if __name__ == "__main__" :
         "Position/ClampInWorld": "Position/ClampInWorld: 在世界中夹紧",
         "Position/ClampOutMap": "Position/ClampOutMap: 夹紧地图外",
         "Position/HasNearlyNullBBox": "Position/HasNearlyNullBBox: 具有几乎为零的包围盒",
-        "Position/GfxDescriptorPorteur": "Position/GfxDescriptorPorteur: 图形描述携带者",
+        "Position/GfxDescriptorPorteur": "Position/GfxDescriptorPorteur: 携带者图形描述符",
         "Position/Radius": "Position/Radius: 半径",
         "Position/RelativeScanningPosition": "Position/RelativeScanningPosition: 相对扫描位置",
         "Position/CameraFollower": "Position/CameraFollower: 相机跟随者",
@@ -162,7 +133,7 @@ if __name__ == "__main__" :
         "Visibility/UnitIsStealth": "Visibility/UnitIsStealth: 单位隐身",
         "Visibility/HideFromDebug": "Visibility/HideFromDebug: 隐藏调试信息",
         "Visibility/VisionObstructionType": "Visibility/VisionObstructionType: 视觉遮挡类型",
-        "Visibility/GroundDissimulationModifierType": "Visibility/GroundDissimulationModifierType: 地面伪装修改类型",
+        "Visibility/GroundDissimulationModifierType": "Visibility/GroundDissimulationModifierType: 地面隐蔽修正类型",
         "ApparenceModel/AllowMissingGameplayBBoxBone": "ApparenceModel/AllowMissingGameplayBBoxBone: 允许缺少的游戏包围盒骨骼",
         "ApparenceModel/Scale": "ApparenceModel/Scale: 缩放",
         "ApparenceModel/PickableObject": "ApparenceModel/PickableObject: 可拾取物体",
@@ -423,7 +394,7 @@ if __name__ == "__main__" :
         "AirplaneMovement/PitchAngle": "AirplaneMovement/PitchAngle: 俯仰角度",
         "AirplaneMovement/PitchSpeed": "AirplaneMovement/PitchSpeed: 俯仰速度",
         "AirplaneMovement/RollAngle": "AirplaneMovement/RollAngle: 滚转角度",
-        "AirplaneMovement/RollSpeed": "AirplaneMovement/RollSpeed:滚转速度",
+        "AirplaneMovement/RollSpeed": "AirplaneMovement/RollSpeed: 滚转速度",
         "AirplaneMovement/EvacAngle": "AirplaneMovement/EvacAngle: 撤离角度",
         "AirplaneMovement/FollowGround": "AirplaneMovement/FollowGround: 跟随地面",
         "AirplaneMovement/IgnoreBattlefieldOrders": "AirplaneMovement/IgnoreBattlefieldOrders: 忽略战场指令",
